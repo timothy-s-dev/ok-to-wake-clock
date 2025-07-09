@@ -148,19 +148,56 @@ uint8_t Clock::getCurrentMinutes() {
 }
 
 uint8_t Clock::getCurrentDayOfWeek() {
-    // Day of week is stored in register 0x03
     Wire.beginTransmission(RTC_ADDRESS);
-    Wire.write(0x03);
+    Wire.write(RTC_DAY_OF_WEEK_REG);
     Wire.endTransmission();
     
     Wire.requestFrom(RTC_ADDRESS, (uint8_t)1);
     if (Wire.available()) {
         uint8_t day = bcdToDecimal(Wire.read());
-        // DS3231 uses 1=Sunday, 2=Monday, ... 7=Saturday
-        // Convert to 0=Sunday, 1=Monday, ... 6=Saturday
-        return (day == 0) ? 0 : day - 1;
+        return day;
     }
     return 0; // Default to Sunday
+}
+
+uint8_t Clock::getCurrentDate() {
+    Wire.beginTransmission(RTC_ADDRESS);
+    Wire.write(RTC_DATE_REG);
+    Wire.endTransmission();
+    
+    Wire.requestFrom(RTC_ADDRESS, (uint8_t)1);
+    if (Wire.available()) {
+        return bcdToDecimal(Wire.read());
+    }
+    return 1; // Default to 1st of month
+}
+
+uint8_t Clock::getCurrentMonth() {
+    Wire.beginTransmission(RTC_ADDRESS);
+    Wire.write(RTC_MONTH_REG);
+    Wire.endTransmission();
+    
+    Wire.requestFrom(RTC_ADDRESS, (uint8_t)1);
+    if (Wire.available()) {
+        uint8_t monthByte = Wire.read();
+        // Mask out the century bit (bit 7) and convert BCD to decimal
+        return bcdToDecimal(monthByte & 0x7F);
+    }
+    return 1; // Default to January
+}
+
+uint16_t Clock::getCurrentYear() {
+    Wire.beginTransmission(RTC_ADDRESS);
+    Wire.write(RTC_YEAR_REG);
+    Wire.endTransmission();
+    
+    Wire.requestFrom(RTC_ADDRESS, (uint8_t)1);
+    if (Wire.available()) {
+        uint8_t yearByte = bcdToDecimal(Wire.read());
+        // DS3231 stores only 2-digit year, add 2000 to get full year
+        return 2000 + yearByte;
+    }
+    return 2025; // Default to current year
 }
 
 // Helper function to check current schedule phase and update RGB LED
