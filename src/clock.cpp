@@ -206,12 +206,84 @@ void Clock::updateScheduleLED() {
     uint8_t currentMinute = getCurrentMinutes();
     uint8_t dayOfWeek = getCurrentDayOfWeek();
     
-    // Load today's schedule
-    DaySchedule todaySchedule;
-    Settings::loadSchedule(static_cast<DayOfWeek>(dayOfWeek), todaySchedule);
-    
     // Convert current time to minutes since midnight
     int currentMinutes = currentHour * 60 + currentMinute;
+    
+    // Check if there's an active nap first - naps take priority
+    NapSchedule napSchedule;
+    bool hasActiveNap = Settings::loadNapSchedule(napSchedule) && napSchedule.active;
+    
+    if (hasActiveNap) {
+        Logger.info(MAIN_LOG, "Active nap detected, using nap schedule");
+        
+        // Convert nap schedule times to minutes since midnight
+        int winddownStart = napSchedule.winddownStartHour * 60 + napSchedule.winddownStartMinute;
+        int sleepStart = napSchedule.sleepStartHour * 60 + napSchedule.sleepStartMinute;
+        int quietStart = napSchedule.quietStartHour * 60 + napSchedule.quietStartMinute;
+        int wakeStart = napSchedule.wakeStartHour * 60 + napSchedule.wakeStartMinute;
+        int wakeEnd = napSchedule.wakeEndHour * 60 + napSchedule.wakeEndMinute;
+        
+        Logger.info(MAIN_LOG, "Nap Schedule: Sleep %02d:%02d, Quiet %02d:%02d, Wake %02d:%02d - %02d:%02d",
+                    napSchedule.sleepStartHour, napSchedule.sleepStartMinute,
+                    napSchedule.quietStartHour, napSchedule.quietStartMinute,
+                    napSchedule.wakeStartHour, napSchedule.wakeStartMinute,
+                    napSchedule.wakeEndHour, napSchedule.wakeEndMinute);
+                    
+        // Use nap schedule for LED logic
+        bool inWinddown = false;
+        bool inSleep = false;
+        bool inQuiet = false;
+        bool inWake = false;
+        
+        // Check nap phases with day wrapping
+        if (winddownStart <= sleepStart) {
+            inWinddown = (currentMinutes >= winddownStart && currentMinutes < sleepStart);
+        } else {
+            inWinddown = (currentMinutes >= winddownStart || currentMinutes < sleepStart);
+        }
+        
+        if (sleepStart <= quietStart) {
+            inSleep = (currentMinutes >= sleepStart && currentMinutes < quietStart);
+        } else {
+            inSleep = (currentMinutes >= sleepStart || currentMinutes < quietStart);
+        }
+        
+        if (quietStart <= wakeStart) {
+            inQuiet = (currentMinutes >= quietStart && currentMinutes < wakeStart);
+        } else {
+            inQuiet = (currentMinutes >= quietStart || currentMinutes < wakeStart);
+        }
+        
+        if (wakeStart <= wakeEnd) {
+            inWake = (currentMinutes >= wakeStart && currentMinutes < wakeEnd);
+        } else {
+            inWake = (currentMinutes >= wakeStart || currentMinutes < wakeEnd);
+        }
+        
+        Logger.info(MAIN_LOG, "Nap Phases: Winddown=%d, Sleep=%d, Quiet=%d, Wake=%d", inWinddown, inSleep, inQuiet, inWake);
+        
+        // Set LED color based on nap phase
+        if (inWinddown) {
+            RgbLed::setColor(0, 0, 255);
+        } else if (inSleep) {
+            RgbLed::setColor(255, 0, 0);
+        } else if (inQuiet) {
+            RgbLed::setColor(255, 255, 0);
+        } else if (inWake) {
+            RgbLed::setColor(0, 255, 0);
+        } else {
+            // Nap is over, deactivate it
+            Logger.info(MAIN_LOG, "Nap period ended, deactivating nap");
+            Settings::stopNap();
+            RgbLed::turnOff();
+        }
+        
+        return; // Exit early since we're using nap schedule
+    }
+    
+    // No active nap, use regular daily schedule
+    DaySchedule todaySchedule;
+    Settings::loadSchedule(static_cast<DayOfWeek>(dayOfWeek), todaySchedule);
     
     // Convert schedule times to minutes since midnight
     int winddownStart = todaySchedule.winddownStartHour * 60 + todaySchedule.winddownStartMinute;
@@ -221,7 +293,7 @@ void Clock::updateScheduleLED() {
     int wakeEnd = todaySchedule.wakeEndHour * 60 + todaySchedule.wakeEndMinute;
 
     Logger.info(MAIN_LOG, "Current time: %02d:%02d, Day: %d", currentHour, currentMinute, dayOfWeek);
-    Logger.info(MAIN_LOG, "Schedule: Winddown %02d:%02d, Sleep %02d:%02d, Quiet %02d:%02d, Wake %02d:%02d - %02d:%02d",
+    Logger.info(MAIN_LOG, "Daily Schedule: Winddown %02d:%02d, Sleep %02d:%02d, Quiet %02d:%02d, Wake %02d:%02d - %02d:%02d",
                 todaySchedule.winddownStartHour, todaySchedule.winddownStartMinute,
                 todaySchedule.sleepStartHour, todaySchedule.sleepStartMinute,
                 todaySchedule.quietStartHour, todaySchedule.quietStartMinute,
@@ -280,4 +352,60 @@ void Clock::updateScheduleLED() {
     } else {
         RgbLed::turnOff();
     }
+}
+
+bool Clock::startNap(uint16_t durationMinutes) {
+    uint8_t currentHour = getCurrentHours();
+    uint8_t currentMinute = getCurrentMinutes();
+    
+    Logger.info(MAIN_LOG, "Starting nap at %02d:%02d for %d minutes", currentHour, currentMinute, durationMinutes);
+    
+    NapSchedule napSchedule;
+    
+    // Calculate winddown start (15 minutes ago)
+    int winddownMinutes = (currentHour * 60 + currentMinute) - 15;
+    if (winddownMinutes < 0) winddownMinutes += 24 * 60; // Handle day wrap
+    napSchedule.winddownStartHour = (winddownMinutes / 60) % 24;
+    napSchedule.winddownStartMinute = winddownMinutes % 60;
+    
+    // Sleep start is now
+    napSchedule.sleepStartHour = currentHour;
+    napSchedule.sleepStartMinute = currentMinute;
+    
+    // Quiet start is now + duration
+    int quietMinutes = (currentHour * 60 + currentMinute) + durationMinutes;
+    if (quietMinutes >= 24 * 60) quietMinutes -= 24 * 60; // Handle day wrap
+    napSchedule.quietStartHour = (quietMinutes / 60) % 24;
+    napSchedule.quietStartMinute = quietMinutes % 60;
+    
+    // Wake start is quiet start + 15 minutes
+    int wakeStartMinutes = quietMinutes + 15;
+    if (wakeStartMinutes >= 24 * 60) wakeStartMinutes -= 24 * 60; // Handle day wrap
+    napSchedule.wakeStartHour = (wakeStartMinutes / 60) % 24;
+    napSchedule.wakeStartMinute = wakeStartMinutes % 60;
+    
+    // Wake end is quiet start + 30 minutes (15 minutes after wake start)
+    int wakeEndMinutes = quietMinutes + 30;
+    if (wakeEndMinutes >= 24 * 60) wakeEndMinutes -= 24 * 60; // Handle day wrap
+    napSchedule.wakeEndHour = (wakeEndMinutes / 60) % 24;
+    napSchedule.wakeEndMinute = wakeEndMinutes % 60;
+    
+    // Set as active
+    napSchedule.active = true;
+    
+    // Save the nap schedule
+    bool success = Settings::saveNapSchedule(napSchedule);
+    
+    if (success) {
+        Logger.info(MAIN_LOG, "Nap schedule created: Sleep %02d:%02d, Quiet %02d:%02d, Wake %02d:%02d-%02d:%02d",
+                    napSchedule.sleepStartHour, napSchedule.sleepStartMinute,
+                    napSchedule.quietStartHour, napSchedule.quietStartMinute,
+                    napSchedule.wakeStartHour, napSchedule.wakeStartMinute,
+                    napSchedule.wakeEndHour, napSchedule.wakeEndMinute);
+        
+        // Update LED immediately
+        updateScheduleLED();
+    }
+    
+    return success;
 }

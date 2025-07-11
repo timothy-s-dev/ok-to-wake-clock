@@ -39,6 +39,7 @@ public:
     static uint16_t getCurrentYear();
     static uint8_t getCurrentDayOfWeek(); // 0=Sunday, 1=Monday, ..., 6=Saturday
     static void updateScheduleLED(); // Update RGB LED based on current schedule
+    static bool startNap(uint16_t durationMinutes); // Start a nap with specified duration
 };
 
 #endif

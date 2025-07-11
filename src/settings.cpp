@@ -1,6 +1,7 @@
 #include "settings.h"
 #include <Elog.h>
 #include <logging.h>
+#include <cstring>
 
 // Static member definitions
 Preferences Settings::preferences;
@@ -192,5 +193,107 @@ void Settings::initializeDefaults() {
         saveSchedule(static_cast<DayOfWeek>(day), defaultSchedule);
     }
 
+    // Initialize nap schedule as inactive
+    NapSchedule defaultNap;
+    memset(&defaultNap, 0, sizeof(defaultNap));
+    defaultNap.active = false;
+    saveNapSchedule(defaultNap);
+
     Logger.info(MAIN_LOG, "Default schedules initialized for all days");
+}
+
+bool Settings::saveNapSchedule(const NapSchedule& napSchedule) {
+    if (!initialized) {
+        Logger.error(MAIN_LOG, "Settings not initialized");
+        return false;
+    }
+    
+    // Store the nap schedule as a byte array (10 bytes for times + 1 byte for active flag)
+    uint8_t napData[11] = {
+        napSchedule.winddownStartHour,
+        napSchedule.winddownStartMinute,
+        napSchedule.sleepStartHour,
+        napSchedule.sleepStartMinute,
+        napSchedule.quietStartHour,
+        napSchedule.quietStartMinute,
+        napSchedule.wakeStartHour,
+        napSchedule.wakeStartMinute,
+        napSchedule.wakeEndHour,
+        napSchedule.wakeEndMinute,
+        napSchedule.active ? 1 : 0
+    };
+    
+    size_t bytesWritten = preferences.putBytes("nap_schedule", napData, sizeof(napData));
+    
+    if (bytesWritten != sizeof(napData)) {
+        Logger.error(MAIN_LOG, "Failed to save nap schedule");
+        return false;
+    }
+
+    Logger.info(MAIN_LOG, "Nap schedule saved (active: %s)", napSchedule.active ? "true" : "false");
+    return true;
+}
+
+bool Settings::loadNapSchedule(NapSchedule& napSchedule) {
+    if (!initialized) {
+        Logger.error(MAIN_LOG, "Settings not initialized");
+        return false;
+    }
+    
+    uint8_t napData[11];
+    
+    size_t bytesRead = preferences.getBytes("nap_schedule", napData, sizeof(napData));
+    
+    if (bytesRead != sizeof(napData)) {
+        Logger.warning(MAIN_LOG, "Failed to load nap schedule, using defaults");
+        memset(&napSchedule, 0, sizeof(napSchedule));
+        napSchedule.active = false;
+        return false;
+    }
+    
+    // Unpack the data into the nap schedule structure
+    napSchedule.winddownStartHour = napData[0];
+    napSchedule.winddownStartMinute = napData[1];
+    napSchedule.sleepStartHour = napData[2];
+    napSchedule.sleepStartMinute = napData[3];
+    napSchedule.quietStartHour = napData[4];
+    napSchedule.quietStartMinute = napData[5];
+    napSchedule.wakeStartHour = napData[6];
+    napSchedule.wakeStartMinute = napData[7];
+    napSchedule.wakeEndHour = napData[8];
+    napSchedule.wakeEndMinute = napData[9];
+    napSchedule.active = (napData[10] != 0);
+    
+    return true;
+}
+
+bool Settings::stopNap() {
+    if (!initialized) {
+        Logger.error(MAIN_LOG, "Settings not initialized");
+        return false;
+    }
+    
+    NapSchedule napSchedule;
+    if (!loadNapSchedule(napSchedule)) {
+        Logger.warning(MAIN_LOG, "Could not load nap schedule to stop");
+        return false;
+    }
+    
+    napSchedule.active = false;
+    Logger.info(MAIN_LOG, "Stopping nap");
+    
+    return saveNapSchedule(napSchedule);
+}
+
+bool Settings::isNapActive() {
+    if (!initialized) {
+        return false;
+    }
+    
+    NapSchedule napSchedule;
+    if (!loadNapSchedule(napSchedule)) {
+        return false;
+    }
+    
+    return napSchedule.active;
 }

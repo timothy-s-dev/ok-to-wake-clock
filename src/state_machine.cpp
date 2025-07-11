@@ -14,6 +14,9 @@ static uint8_t tempQuietStartHour = 23;
 static uint8_t tempQuietStartMinute = 0;
 static DayOfWeek currentScheduleDay = SUNDAY;
 
+// Nap setting variables
+static uint16_t tempNapDuration = 60; // Default 60 minutes
+
 // Forward declarations of states
 extern State Clock;
 extern State MenuTime;
@@ -26,6 +29,7 @@ extern State ScheduleSetSleepHours;
 extern State ScheduleSetSleepMinutes;
 extern State ScheduleSetQuietHours;
 extern State ScheduleSetQuietMinutes;
+extern State NapSetDuration;
 
 void StateMachine::init() {
   setState(&Clock);
@@ -96,11 +100,30 @@ State MenuSchedule = {
 };
 
 State MenuNap = {
-  .OnEnter = []() { Display::getInstance().print("NAP"); },
+  .OnEnter = []() { 
+    // Check if nap is currently active
+    if (Settings::isNapActive()) {
+      Display::getInstance().print("STOP");
+    } else {
+      Display::getInstance().print("NAP");
+    }
+  },
   .OnExit = []() { Display::getInstance().clear(); },
   .OnClockwise = []() { StateMachine::setState(&MenuLock); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuSchedule); },
-  .OnSelect = []() { StateMachine::setState(&Clock); }
+  .OnSelect = []() { 
+    if (Settings::isNapActive()) {
+      // Stop the current nap
+      Settings::stopNap();
+      Clock::updateScheduleLED(); // Update LED immediately
+      Logger.info(MAIN_LOG, "Nap stopped by user");
+      StateMachine::setState(&Clock);
+    } else {
+      // Start nap duration selection
+      tempNapDuration = 60; // Reset to default
+      StateMachine::setState(&NapSetDuration);
+    }
+  }
 };
 
 State MenuLock = {
@@ -322,6 +345,39 @@ State ScheduleSetQuietMinutes = {
     saveCompleteSchedule();
     // Update the RGB LED based on the new schedule
     Clock::updateScheduleLED();
+    StateMachine::setState(&Clock); 
+  }
+};
+
+State NapSetDuration = {
+  .OnEnter = []() {
+    Display::getInstance().print(String(tempNapDuration));
+    delay(10);
+    Display::getInstance().colonOff();
+  },
+  .OnExit = []() { Display::getInstance().clear(); },
+  .OnClockwise = []() { 
+    // Increment duration by 5 minutes, max 300 (5 hours)
+    tempNapDuration += 5;
+    if (tempNapDuration > 300) {
+      tempNapDuration = 300;
+    }
+    Display::getInstance().print(String(tempNapDuration));
+  },
+  .OnCounterClockwise = []() { 
+    // Decrement duration by 5 minutes, min 5
+    if (tempNapDuration > 5) {
+      tempNapDuration -= 5;
+    }
+    Display::getInstance().print(String(tempNapDuration));
+  },
+  .OnSelect = []() { 
+    // Start the nap with the selected duration
+    if (Clock::startNap(tempNapDuration)) {
+      Logger.info(MAIN_LOG, "Nap started with duration %d minutes", tempNapDuration);
+    } else {
+      Logger.error(MAIN_LOG, "Failed to start nap");
+    }
     StateMachine::setState(&Clock); 
   }
 };
