@@ -34,6 +34,7 @@ public:
     static void update(); // Call this in main loop to check for time changes
     static uint8_t getCurrentHours();
     static uint8_t getCurrentMinutes();
+    static uint16_t getMinutesSinceMidnight();
     static uint8_t getCurrentDate();
     static uint8_t getCurrentMonth();
     static uint16_t getCurrentYear();

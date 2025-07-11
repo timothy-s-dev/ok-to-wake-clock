@@ -2,6 +2,7 @@
 #include "display.h"
 #include "clock.h"
 #include "settings.h"
+#include "schedule.h"
 #include <Elog.h>
 #include <logging.h>
 
@@ -85,16 +86,14 @@ State MenuSchedule = {
   .OnClockwise = []() { StateMachine::setState(&MenuNap); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuTime); },
   .OnSelect = []() { 
-    // Initialize with current day's schedule or defaults
-    DaySchedule currentSchedule;
-    currentScheduleDay = SUNDAY; // Start with Sunday for now
-    if (!Settings::loadSchedule(currentScheduleDay, currentSchedule)) {
-      currentSchedule = Settings::getDefaultSchedule();
-    }
-    tempSleepStartHour = currentSchedule.sleepStartHour;
-    tempSleepStartMinute = currentSchedule.sleepStartMinute;
-    tempQuietStartHour = currentSchedule.quietStartHour;
-    tempQuietStartMinute = currentSchedule.quietStartMinute;
+    Schedule currentSchedule;
+    currentScheduleDay = SUNDAY;
+    Settings::loadSchedule(currentScheduleDay, currentSchedule);
+    
+    tempSleepStartHour = currentSchedule.getSleepStartHour();
+    tempSleepStartMinute = currentSchedule.getSleepStartMinute();
+    tempQuietStartHour = currentSchedule.getQuietStartHour();
+    tempQuietStartMinute = currentSchedule.getQuietStartMinute();
     StateMachine::setState(&ScheduleSetSleepHours); 
   }
 };
@@ -102,7 +101,7 @@ State MenuSchedule = {
 State MenuNap = {
   .OnEnter = []() { 
     // Check if nap is currently active
-    if (Settings::isNapActive()) {
+    if (Settings::isNapEnabled()) {
       Display::getInstance().print("STOP");
     } else {
       Display::getInstance().print("NAP");
@@ -112,15 +111,13 @@ State MenuNap = {
   .OnClockwise = []() { StateMachine::setState(&MenuLock); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuSchedule); },
   .OnSelect = []() { 
-    if (Settings::isNapActive()) {
-      // Stop the current nap
+    if (Settings::isNapEnabled()) {
       Settings::stopNap();
-      Clock::updateScheduleLED(); // Update LED immediately
+      Clock::updateScheduleLED();
       Logger.info(MAIN_LOG, "Nap stopped by user");
       StateMachine::setState(&Clock);
     } else {
-      // Start nap duration selection
-      tempNapDuration = 60; // Reset to default
+      tempNapDuration = 60;
       StateMachine::setState(&NapSetDuration);
     }
   }
@@ -200,34 +197,35 @@ State TimeSetMinutes = {
 
 // Helper function to calculate and save complete schedule
 void saveCompleteSchedule() {
-  DaySchedule schedule;
+  Schedule schedule;
   
-  // Set the user-configured values
-  schedule.sleepStartHour = tempSleepStartHour;
-  schedule.sleepStartMinute = tempSleepStartMinute;
-  schedule.quietStartHour = tempQuietStartHour;
-  schedule.quietStartMinute = tempQuietStartMinute;
+  // Set the user-configured sleep and quiet start times
+  schedule.setSleepStart(tempSleepStartHour, tempSleepStartMinute);
+  schedule.setQuietStart(tempQuietStartHour, tempQuietStartMinute);
   
   // Calculate winddown start (sleep start - 30 minutes)
   int winddownMinutes = (tempSleepStartHour * 60 + tempSleepStartMinute) - 30;
   if (winddownMinutes < 0) winddownMinutes += 24 * 60; // Handle day wrap
-  schedule.winddownStartHour = (winddownMinutes / 60) % 24;
-  schedule.winddownStartMinute = winddownMinutes % 60;
+  uint8_t winddownHour = (winddownMinutes / 60) % 24;
+  uint8_t winddownMinute = winddownMinutes % 60;
+  schedule.setWinddownStart(winddownHour, winddownMinute);
   
   // Calculate wake start (quiet start + 15 minutes)
   int wakeStartMinutes = (tempQuietStartHour * 60 + tempQuietStartMinute) + 15;
   if (wakeStartMinutes >= 24 * 60) wakeStartMinutes -= 24 * 60; // Handle day wrap
-  schedule.wakeStartHour = (wakeStartMinutes / 60) % 24;
-  schedule.wakeStartMinute = wakeStartMinutes % 60;
+  uint8_t wakeStartHour = (wakeStartMinutes / 60) % 24;
+  uint8_t wakeStartMin = wakeStartMinutes % 60;
+  schedule.setWakeStart(wakeStartHour, wakeStartMin);
   
   // Calculate wake end (quiet start + 30 minutes)
   int wakeEndMinutes = (tempQuietStartHour * 60 + tempQuietStartMinute) + 30;
   if (wakeEndMinutes >= 24 * 60) wakeEndMinutes -= 24 * 60; // Handle day wrap
-  schedule.wakeEndHour = (wakeEndMinutes / 60) % 24;
-  schedule.wakeEndMinute = wakeEndMinutes % 60;
+  uint8_t wakeEndHour = (wakeEndMinutes / 60) % 24;
+  uint8_t wakeEndMin = wakeEndMinutes % 60;
+  schedule.setWakeEnd(wakeEndHour, wakeEndMin);
   
   // Save the schedule to all 7 days of the week
-  DaySchedule allSchedules[7];
+  Schedule allSchedules[7];
   for (int i = 0; i < 7; i++) {
     allSchedules[i] = schedule;
   }

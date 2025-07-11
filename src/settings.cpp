@@ -30,7 +30,7 @@ bool Settings::init() {
     return true;
 }
 
-bool Settings::saveSchedule(DayOfWeek day, const DaySchedule& schedule) {
+bool Settings::saveSchedule(DayOfWeek day, const Schedule& schedule) {
     if (!initialized) {
         Logger.error(MAIN_LOG, "Settings not initialized");
         return false;
@@ -38,23 +38,12 @@ bool Settings::saveSchedule(DayOfWeek day, const DaySchedule& schedule) {
     
     String key = getDayKey(day);
     
-    // Store the schedule as a byte array
-    uint8_t scheduleData[10] = {
-        schedule.winddownStartHour,
-        schedule.winddownStartMinute,
-        schedule.sleepStartHour,
-        schedule.sleepStartMinute,
-        schedule.quietStartHour,
-        schedule.quietStartMinute,
-        schedule.wakeStartHour,
-        schedule.wakeStartMinute,
-        schedule.wakeEndHour,
-        schedule.wakeEndMinute
-    };
+    // Convert schedule to byte array
+    std::array<uint8_t, 10> scheduleData = schedule.convertToByteArray();
     
-    size_t bytesWritten = preferences.putBytes(key.c_str(), scheduleData, sizeof(scheduleData));
+    size_t bytesWritten = preferences.putBytes(key.c_str(), scheduleData.data(), scheduleData.size());
     
-    if (bytesWritten != sizeof(scheduleData)) {
+    if (bytesWritten != scheduleData.size()) {
         Logger.error(MAIN_LOG, "Failed to save schedule for day %d", day);
         return false;
     }
@@ -63,7 +52,7 @@ bool Settings::saveSchedule(DayOfWeek day, const DaySchedule& schedule) {
     return true;
 }
 
-bool Settings::loadSchedule(DayOfWeek day, DaySchedule& schedule) {
+bool Settings::loadSchedule(DayOfWeek day, Schedule& schedule) {
     if (!initialized) {
         Logger.error(MAIN_LOG, "Settings not initialized");
         return false;
@@ -76,26 +65,19 @@ bool Settings::loadSchedule(DayOfWeek day, DaySchedule& schedule) {
     
     if (bytesRead != sizeof(scheduleData)) {
         Logger.error(MAIN_LOG, "Failed to load schedule for day %d, using defaults", day);
-        schedule = getDefaultSchedule();
+        schedule = Schedule();
         return false;
     }
     
-    // Unpack the data into the schedule structure
-    schedule.winddownStartHour = scheduleData[0];
-    schedule.winddownStartMinute = scheduleData[1];
-    schedule.sleepStartHour = scheduleData[2];
-    schedule.sleepStartMinute = scheduleData[3];
-    schedule.quietStartHour = scheduleData[4];
-    schedule.quietStartMinute = scheduleData[5];
-    schedule.wakeStartHour = scheduleData[6];
-    schedule.wakeStartMinute = scheduleData[7];
-    schedule.wakeEndHour = scheduleData[8];
-    schedule.wakeEndMinute = scheduleData[9];
+    // Convert byte array to Schedule object
+    std::array<uint8_t, 10> dataArray;
+    std::copy(scheduleData, scheduleData + 10, dataArray.begin());
+    schedule = Schedule::fromByteArray(dataArray);
     
     return true;
 }
 
-bool Settings::loadAllSchedules(DaySchedule schedules[7]) {
+bool Settings::loadAllSchedules(Schedule schedules[7]) {
     bool allSuccess = true;
     
     for (int day = 0; day < 7; day++) {
@@ -107,7 +89,7 @@ bool Settings::loadAllSchedules(DaySchedule schedules[7]) {
     return allSuccess;
 }
 
-bool Settings::saveAllSchedules(const DaySchedule schedules[7]) {
+bool Settings::saveAllSchedules(const Schedule schedules[7]) {
     bool allSuccess = true;
     
     for (int day = 0; day < 7; day++) {
@@ -120,13 +102,13 @@ bool Settings::saveAllSchedules(const DaySchedule schedules[7]) {
 }
 
 bool Settings::resetSchedule(DayOfWeek day) {
-    DaySchedule defaultSchedule = getDefaultSchedule();
+    Schedule defaultSchedule = getDefaultSchedule();
     return saveSchedule(day, defaultSchedule);
 }
 
 bool Settings::resetAllSchedules() {
     bool allSuccess = true;
-    DaySchedule defaultSchedule = getDefaultSchedule();
+    Schedule defaultSchedule = getDefaultSchedule();
     
     for (int day = 0; day < 7; day++) {
         if (!saveSchedule(static_cast<DayOfWeek>(day), defaultSchedule)) {
@@ -139,29 +121,6 @@ bool Settings::resetAllSchedules() {
 
 bool Settings::isInitialized() {
     return initialized && preferences.getBool("initialized", false);
-}
-
-DaySchedule Settings::getDefaultSchedule() {
-    DaySchedule defaultSchedule;
-    
-    // Default schedule: 
-    // Winddown starts at 19:45 (7:45 PM)
-    // Sleep starts at 20:00 (8:00 PM)
-    // Quiet hours start at 07:15 (7:15 AM)
-    // Wake starts at 7:30 (7:30 AM)
-    // Wake ends at 7:45 (7:45 AM)
-    defaultSchedule.winddownStartHour = 19;
-    defaultSchedule.winddownStartMinute = 45;
-    defaultSchedule.sleepStartHour = 20;
-    defaultSchedule.sleepStartMinute = 0;
-    defaultSchedule.quietStartHour = 7;
-    defaultSchedule.quietStartMinute = 15;
-    defaultSchedule.wakeStartHour = 7;
-    defaultSchedule.wakeStartMinute = 30;
-    defaultSchedule.wakeEndHour = 7;
-    defaultSchedule.wakeEndMinute = 45;
-    
-    return defaultSchedule;
 }
 
 void Settings::close() {
@@ -186,7 +145,7 @@ String Settings::getDayKey(DayOfWeek day) {
 }
 
 void Settings::initializeDefaults() {
-    DaySchedule defaultSchedule = getDefaultSchedule();
+    Schedule defaultSchedule;
     
     // Initialize all days with the same default schedule
     for (int day = 0; day < 7; day++) {
@@ -194,77 +153,86 @@ void Settings::initializeDefaults() {
     }
 
     // Initialize nap schedule as inactive
-    NapSchedule defaultNap;
-    memset(&defaultNap, 0, sizeof(defaultNap));
-    defaultNap.active = false;
-    saveNapSchedule(defaultNap);
+    Schedule defaultNap = Schedule::getNap(30); // Default nap duration of 30 minutes
+    saveNapSchedule(defaultSchedule);
+    setNapEnabled(false);
 
     Logger.info(MAIN_LOG, "Default schedules initialized for all days");
 }
 
-bool Settings::saveNapSchedule(const NapSchedule& napSchedule) {
+bool Settings::saveNapSchedule(const Schedule& napSchedule) {
     if (!initialized) {
         Logger.error(MAIN_LOG, "Settings not initialized");
         return false;
     }
     
-    // Store the nap schedule as a byte array (10 bytes for times + 1 byte for active flag)
-    uint8_t napData[11] = {
-        napSchedule.winddownStartHour,
-        napSchedule.winddownStartMinute,
-        napSchedule.sleepStartHour,
-        napSchedule.sleepStartMinute,
-        napSchedule.quietStartHour,
-        napSchedule.quietStartMinute,
-        napSchedule.wakeStartHour,
-        napSchedule.wakeStartMinute,
-        napSchedule.wakeEndHour,
-        napSchedule.wakeEndMinute,
-        napSchedule.active ? 1 : 0
-    };
+    // Convert schedule to byte array
+    std::array<uint8_t, 10> napData = napSchedule.convertToByteArray();
     
-    size_t bytesWritten = preferences.putBytes("nap_schedule", napData, sizeof(napData));
+    size_t bytesWritten = preferences.putBytes("nap_schedule", napData.data(), napData.size());
     
-    if (bytesWritten != sizeof(napData)) {
+    if (bytesWritten != napData.size()) {
         Logger.error(MAIN_LOG, "Failed to save nap schedule");
         return false;
     }
 
-    Logger.info(MAIN_LOG, "Nap schedule saved (active: %s)", napSchedule.active ? "true" : "false");
+    Logger.info(MAIN_LOG, "Nap schedule saved");
     return true;
 }
 
-bool Settings::loadNapSchedule(NapSchedule& napSchedule) {
+bool Settings::loadNapSchedule(Schedule& napSchedule) {
     if (!initialized) {
         Logger.error(MAIN_LOG, "Settings not initialized");
         return false;
     }
     
-    uint8_t napData[11];
+    uint8_t napData[10];
     
     size_t bytesRead = preferences.getBytes("nap_schedule", napData, sizeof(napData));
     
     if (bytesRead != sizeof(napData)) {
         Logger.warning(MAIN_LOG, "Failed to load nap schedule, using defaults");
-        memset(&napSchedule, 0, sizeof(napSchedule));
-        napSchedule.active = false;
+        napSchedule = Schedule(); // Default schedule
         return false;
     }
     
-    // Unpack the data into the nap schedule structure
-    napSchedule.winddownStartHour = napData[0];
-    napSchedule.winddownStartMinute = napData[1];
-    napSchedule.sleepStartHour = napData[2];
-    napSchedule.sleepStartMinute = napData[3];
-    napSchedule.quietStartHour = napData[4];
-    napSchedule.quietStartMinute = napData[5];
-    napSchedule.wakeStartHour = napData[6];
-    napSchedule.wakeStartMinute = napData[7];
-    napSchedule.wakeEndHour = napData[8];
-    napSchedule.wakeEndMinute = napData[9];
-    napSchedule.active = (napData[10] != 0);
+    // Convert byte array to Schedule object
+    std::array<uint8_t, 10> dataArray;
+    std::copy(napData, napData + 10, dataArray.begin());
+    napSchedule = Schedule::fromByteArray(dataArray);
     
     return true;
+}
+
+bool Settings::setNapEnabled(bool enabled) {
+    if (!initialized) {
+        Logger.error(MAIN_LOG, "Settings not initialized");
+        return false;
+    }
+    
+    preferences.putBool("nap_schedule_enabled", enabled);
+    Logger.info(MAIN_LOG, "Nap enabled state set to: %s", enabled ? "true" : "false");
+    return true;
+}
+
+bool Settings::isNapEnabled() {
+    if (!initialized) {
+        return false;
+    }
+    
+    return preferences.getBool("nap_schedule_enabled", false);
+}
+
+bool Settings::startNap(uint16_t durationMinutes) {
+    if (!initialized) {
+        Logger.error(MAIN_LOG, "Settings not initialized");
+        return false;
+    }
+    
+    // This function is now deprecated in favor of Clock::startNap
+    // which has access to the current time
+    Logger.warning(MAIN_LOG, "Settings::startNap is deprecated, use Clock::startNap instead");
+    return false;
 }
 
 bool Settings::stopNap() {
@@ -273,27 +241,6 @@ bool Settings::stopNap() {
         return false;
     }
     
-    NapSchedule napSchedule;
-    if (!loadNapSchedule(napSchedule)) {
-        Logger.warning(MAIN_LOG, "Could not load nap schedule to stop");
-        return false;
-    }
-    
-    napSchedule.active = false;
     Logger.info(MAIN_LOG, "Stopping nap");
-    
-    return saveNapSchedule(napSchedule);
-}
-
-bool Settings::isNapActive() {
-    if (!initialized) {
-        return false;
-    }
-    
-    NapSchedule napSchedule;
-    if (!loadNapSchedule(napSchedule)) {
-        return false;
-    }
-    
-    return napSchedule.active;
+    return setNapEnabled(false);
 }
