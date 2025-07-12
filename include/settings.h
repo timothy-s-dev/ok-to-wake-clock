@@ -53,6 +53,10 @@ public:
     static bool startNap(uint16_t durationMinutes); // Start a nap with given duration
     static bool stopNap(); // Stop the current nap
     
+    // Lock mode functions
+    static bool setLocked(bool locked); // Set lock mode state
+    static bool isLocked(); // Check if device is locked
+    
     // Close preferences (call when shutting down)
     static void close();
 

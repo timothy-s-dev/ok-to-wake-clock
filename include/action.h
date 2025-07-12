@@ -6,6 +6,7 @@ enum Action {
   CW,
   CCW,
   SELECT,
+  SELECT_HOLD,
   TIME_CHANGE,
 };
 

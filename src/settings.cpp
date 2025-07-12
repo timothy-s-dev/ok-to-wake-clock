@@ -244,3 +244,22 @@ bool Settings::stopNap() {
     Logger.info(MAIN_LOG, "Stopping nap");
     return setNapEnabled(false);
 }
+
+bool Settings::setLocked(bool locked) {
+    if (!initialized) {
+        Logger.error(MAIN_LOG, "Settings not initialized");
+        return false;
+    }
+    
+    preferences.putBool("device_locked", locked);
+    Logger.info(MAIN_LOG, "Device lock state set to: %s", locked ? "true" : "false");
+    return true;
+}
+
+bool Settings::isLocked() {
+    if (!initialized) {
+        return false;
+    }
+    
+    return preferences.getBool("device_locked", false);
+}

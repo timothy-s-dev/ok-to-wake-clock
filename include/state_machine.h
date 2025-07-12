@@ -12,6 +12,7 @@ struct State {
   void (*OnClockwise)();
   void (*OnCounterClockwise)();
   void (*OnSelect)();
+  void (*OnSelectHold)();
   void (*OnTimeChange)();
 };
 

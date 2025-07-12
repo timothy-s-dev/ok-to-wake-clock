@@ -11,6 +11,8 @@ private:
   static volatile unsigned long lastButtonTime;
   static volatile bool lastButtonState;
   static volatile bool buttonStateStable;
+  static unsigned long buttonPressStartTime;
+  static bool buttonHoldDetected;
 
   static void IRAM_ATTR buttonISR();
 public:

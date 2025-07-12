@@ -8,6 +8,21 @@
 
 State* currentState = nullptr;
 
+// Lock state flag
+static bool isDeviceLocked = false;
+
+// Helper function to show lock message
+void showLockMessage() {
+  String currentDisplay = Clock::getTimeString();
+  Display::getInstance().clear();
+  Display::getInstance().print("LOCK");
+  delay(1000);
+  Display::getInstance().clear();
+  Display::getInstance().print(currentDisplay);
+  delay(10);
+  Display::getInstance().colonOn();
+}
+
 // Schedule setting variables
 static uint8_t tempSleepStartHour = 22;
 static uint8_t tempSleepStartMinute = 0;
@@ -33,6 +48,8 @@ extern State ScheduleSetQuietMinutes;
 extern State NapSetDuration;
 
 void StateMachine::init() {
+  // Check if device is locked on startup
+  isDeviceLocked = Settings::isLocked();
   setState(&Clock);
 }
 
@@ -51,6 +68,7 @@ void StateMachine::processAction(Action action) {
   if (action == CW && currentState->OnClockwise) currentState->OnClockwise();
   if (action == CCW && currentState->OnCounterClockwise) currentState->OnCounterClockwise();
   if (action == SELECT && currentState->OnSelect) currentState->OnSelect();
+  if (action == SELECT_HOLD && currentState->OnSelectHold) currentState->OnSelectHold();
   if (action == TIME_CHANGE && currentState->OnTimeChange) currentState->OnTimeChange();
 }
 
@@ -62,9 +80,41 @@ State Clock = {
     Display::getInstance().colonOn();
   },
   .OnExit = []() { Display::getInstance().colonOff(); Display::getInstance().clear(); },
-  .OnClockwise = []() { StateMachine::setState(&MenuTime); },
-  .OnCounterClockwise = []() { StateMachine::setState(&MenuTime); },
-  .OnSelect = []() { StateMachine::setState(&MenuTime); },
+  .OnClockwise = []() { 
+    if (isDeviceLocked) {
+      showLockMessage();
+    } else {
+      StateMachine::setState(&MenuTime);
+    }
+  },
+  .OnCounterClockwise = []() { 
+    if (isDeviceLocked) {
+      showLockMessage();
+    } else {
+      StateMachine::setState(&MenuTime);
+    }
+  },
+  .OnSelect = []() { 
+    if (isDeviceLocked) {
+      showLockMessage();
+    } else {
+      StateMachine::setState(&MenuTime);
+    }
+  },
+  .OnSelectHold = []() { 
+    if (isDeviceLocked) {
+      // Unlock the device
+      isDeviceLocked = false;
+      Settings::setLocked(false);
+      Display::getInstance().clear();
+      Display::getInstance().print("UNLK");
+      delay(1000);
+      Display::getInstance().clear();
+      Display::getInstance().print(Clock::getTimeString());
+      delay(10);
+      Display::getInstance().colonOn();
+    }
+  },
   .OnTimeChange = []() {
     Display::getInstance().print(Clock::getTimeString());
     delay(10);
@@ -77,7 +127,8 @@ State MenuTime = {
   .OnExit = []() { Display::getInstance().clear(); },
   .OnClockwise = []() { StateMachine::setState(&MenuSchedule); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuLock); },
-  .OnSelect = []() { StateMachine::setState(&TimeSetHours); }
+  .OnSelect = []() { StateMachine::setState(&TimeSetHours); },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State MenuSchedule = {
@@ -95,7 +146,8 @@ State MenuSchedule = {
     tempQuietStartHour = currentSchedule.getQuietStartHour();
     tempQuietStartMinute = currentSchedule.getQuietStartMinute();
     StateMachine::setState(&ScheduleSetSleepHours); 
-  }
+  },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State MenuNap = {
@@ -120,15 +172,42 @@ State MenuNap = {
       tempNapDuration = 60;
       StateMachine::setState(&NapSetDuration);
     }
-  }
+  },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State MenuLock = {
-  .OnEnter = []() { Display::getInstance().print("LOCK"); },
+  .OnEnter = []() { 
+    // Show current lock status
+    if (isDeviceLocked) {
+      Display::getInstance().print("ULCK");  // Show unlock option
+    } else {
+      Display::getInstance().print("LOCK");  // Show lock option
+    }
+  },
   .OnExit = []() { Display::getInstance().clear(); },
   .OnClockwise = []() { StateMachine::setState(&MenuTime); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuNap); },
-  .OnSelect = []() { StateMachine::setState(&Clock); }
+  .OnSelect = []() { 
+    // Toggle lock state
+    if (isDeviceLocked) {
+      // Unlock the device
+      isDeviceLocked = false;
+      Settings::setLocked(false);
+      Display::getInstance().clear();
+      Display::getInstance().print("UNLK");
+      delay(1000);
+    } else {
+      // Lock the device
+      isDeviceLocked = true;
+      Settings::setLocked(true);
+      Display::getInstance().clear();
+      Display::getInstance().print("LOCK");
+      delay(1000);
+    }
+    StateMachine::setState(&Clock);
+  },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State TimeSetHours = {
@@ -162,7 +241,8 @@ State TimeSetHours = {
     String AMPM = currentHours < 12 ? "AM" : "PM";
     Display::getInstance().print(Clock::getTimeString().substring(0, 2) + AMPM);
   },
-  .OnSelect = []() { StateMachine::setState(&TimeSetMinutes); }
+  .OnSelect = []() { StateMachine::setState(&TimeSetMinutes); },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State TimeSetMinutes = {
@@ -192,7 +272,8 @@ State TimeSetMinutes = {
     Clock::setTime(currentHours, currentMinutes, 0);
     Display::getInstance().print("M " + Clock::getTimeString().substring(2));
   },
-  .OnSelect = []() { StateMachine::setState(&Clock); }
+  .OnSelect = []() { StateMachine::setState(&Clock); },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 // Helper function to calculate and save complete schedule
@@ -264,7 +345,8 @@ State ScheduleSetSleepHours = {
     else displayHour = displayHour % 12;
     Display::getInstance().print((displayHour < 10 ? "0" : "") + String(displayHour) + AMPM);
   },
-  .OnSelect = []() { StateMachine::setState(&ScheduleSetSleepMinutes); }
+  .OnSelect = []() { StateMachine::setState(&ScheduleSetSleepMinutes); },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State ScheduleSetSleepMinutes = {
@@ -285,7 +367,8 @@ State ScheduleSetSleepMinutes = {
     String minuteStr = (tempSleepStartMinute < 10) ? "0" + String(tempSleepStartMinute) : String(tempSleepStartMinute);
     Display::getInstance().print("M " + minuteStr);
   },
-  .OnSelect = []() { StateMachine::setState(&ScheduleSetQuietHours); }
+  .OnSelect = []() { StateMachine::setState(&ScheduleSetQuietHours); },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State ScheduleSetQuietHours = {
@@ -317,7 +400,8 @@ State ScheduleSetQuietHours = {
     else displayHour = displayHour % 12;
     Display::getInstance().print((displayHour < 10 ? "0" : "") + String(displayHour) + AMPM);
   },
-  .OnSelect = []() { StateMachine::setState(&ScheduleSetQuietMinutes); }
+  .OnSelect = []() { StateMachine::setState(&ScheduleSetQuietMinutes); },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State ScheduleSetQuietMinutes = {
@@ -344,7 +428,8 @@ State ScheduleSetQuietMinutes = {
     // Update the RGB LED based on the new schedule
     Clock::updateScheduleLED();
     StateMachine::setState(&Clock); 
-  }
+  },
+  .OnSelectHold = []() { /* Do nothing */ }
 };
 
 State NapSetDuration = {
@@ -377,5 +462,6 @@ State NapSetDuration = {
       Logger.error(MAIN_LOG, "Failed to start nap");
     }
     StateMachine::setState(&Clock); 
-  }
+  },
+  .OnSelectHold = []() { /* Do nothing */ }
 };

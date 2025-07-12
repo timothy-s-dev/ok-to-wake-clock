@@ -1,4 +1,6 @@
 #include "encoder.h"
+#include <Elog.h>
+#include <logging.h>
 
 #define DIAL_CLK_PIN 18
 #define DIAL_DT_PIN 19
@@ -10,7 +12,10 @@ volatile bool Encoder::buttonPressed;
 volatile unsigned long Encoder::lastButtonTime;
 volatile bool Encoder::lastButtonState;
 volatile bool Encoder::buttonStateStable;
+unsigned long Encoder::buttonPressStartTime = 0;
+bool Encoder::buttonHoldDetected = false;
 const unsigned long BUTTON_DEBOUNCE_MS = 50;
+const unsigned long BUTTON_HOLD_MS = 3000; // 3 seconds
 
 void IRAM_ATTR Encoder::buttonISR() {
   lastButtonTime = millis();
@@ -51,9 +56,24 @@ Action Encoder::getAction() {
     if (currentButtonState != buttonStateStable) {
       buttonStateStable = currentButtonState;
       
-      // Only register a press on the transition from HIGH to LOW
+      // Button pressed (transition from HIGH to LOW)
       if (buttonStateStable == LOW) {
+        buttonPressStartTime = millis();
+        buttonHoldDetected = false;
+        // Trigger SELECT immediately on button press
         action = SELECT;
+      }
+      // Button released (transition from LOW to HIGH)
+      else if (buttonStateStable == HIGH) {
+        unsigned long pressDuration = millis() - buttonPressStartTime;
+        
+        // Trigger SELECT_HOLD on release if held for 3+ seconds
+        if (pressDuration >= BUTTON_HOLD_MS) {
+          action = SELECT_HOLD;
+        }
+        
+        buttonHoldDetected = false;
+        buttonPressStartTime = 0;
       }
     }
   }
