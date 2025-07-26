@@ -1,6 +1,7 @@
 #include "settings.h"
-#include <Elog.h>
-#include <logging.h>
+#include "schedule.h"
+#include "logging.h"
+#include <Preferences.h>
 #include <cstring>
 
 // Static member definitions
@@ -14,25 +15,25 @@ bool Settings::init() {
     
     // Open preferences in read-write mode
     if (!preferences.begin("wake-clock", false)) {
-        Logger.error(MAIN_LOG, "Failed to initialize preferences");
+        Log::error("Failed to initialize preferences");
         return false;
     }
     
     // Check if this is the first time initialization
     if (!preferences.getBool("initialized", false)) {
-        Logger.info(MAIN_LOG, "First time setup - initializing default schedules");
+        Log::info("First time setup - initializing default schedules");
         initializeDefaults();
         preferences.putBool("initialized", true);
     }
     
     initialized = true;
-    Logger.info(MAIN_LOG, "Settings initialized successfully");
+    Log::info("Settings initialized successfully");
     return true;
 }
 
 bool Settings::saveSchedule(DayOfWeek day, const Schedule& schedule) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
@@ -44,17 +45,17 @@ bool Settings::saveSchedule(DayOfWeek day, const Schedule& schedule) {
     size_t bytesWritten = preferences.putBytes(key.c_str(), scheduleData.data(), scheduleData.size());
     
     if (bytesWritten != scheduleData.size()) {
-        Logger.error(MAIN_LOG, "Failed to save schedule for day %d", day);
+        Log::error("Failed to save schedule for day %d", day);
         return false;
     }
 
-    Logger.info(MAIN_LOG, "Schedule saved for day %d", day);
+    Log::info("Schedule saved for day %d", day);
     return true;
 }
 
 bool Settings::loadSchedule(DayOfWeek day, Schedule& schedule) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
@@ -64,7 +65,7 @@ bool Settings::loadSchedule(DayOfWeek day, Schedule& schedule) {
     size_t bytesRead = preferences.getBytes(key.c_str(), scheduleData, sizeof(scheduleData));
     
     if (bytesRead != sizeof(scheduleData)) {
-        Logger.error(MAIN_LOG, "Failed to load schedule for day %d, using defaults", day);
+        Log::error("Failed to load schedule for day %d, using defaults", day);
         schedule = Schedule();
         return false;
     }
@@ -127,7 +128,7 @@ void Settings::close() {
     if (initialized) {
         preferences.end();
         initialized = false;
-        Logger.info(MAIN_LOG, "Settings closed");
+        Log::info("Settings closed");
     }
 }
 
@@ -157,12 +158,12 @@ void Settings::initializeDefaults() {
     saveNapSchedule(defaultSchedule);
     setNapEnabled(false);
 
-    Logger.info(MAIN_LOG, "Default schedules initialized for all days");
+    Log::info("Default schedules initialized for all days");
 }
 
 bool Settings::saveNapSchedule(const Schedule& napSchedule) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
@@ -172,17 +173,17 @@ bool Settings::saveNapSchedule(const Schedule& napSchedule) {
     size_t bytesWritten = preferences.putBytes("nap_schedule", napData.data(), napData.size());
     
     if (bytesWritten != napData.size()) {
-        Logger.error(MAIN_LOG, "Failed to save nap schedule");
+        Log::error("Failed to save nap schedule");
         return false;
     }
 
-    Logger.info(MAIN_LOG, "Nap schedule saved");
+    Log::info("Nap schedule saved");
     return true;
 }
 
 bool Settings::loadNapSchedule(Schedule& napSchedule) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
@@ -191,7 +192,7 @@ bool Settings::loadNapSchedule(Schedule& napSchedule) {
     size_t bytesRead = preferences.getBytes("nap_schedule", napData, sizeof(napData));
     
     if (bytesRead != sizeof(napData)) {
-        Logger.warning(MAIN_LOG, "Failed to load nap schedule, using defaults");
+        Log::warning("Failed to load nap schedule, using defaults");
         napSchedule = Schedule(); // Default schedule
         return false;
     }
@@ -206,12 +207,12 @@ bool Settings::loadNapSchedule(Schedule& napSchedule) {
 
 bool Settings::setNapEnabled(bool enabled) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
     preferences.putBool("nap_schedule_enabled", enabled);
-    Logger.info(MAIN_LOG, "Nap enabled state set to: %s", enabled ? "true" : "false");
+    Log::info("Nap enabled state set to: %s", enabled ? "true" : "false");
     return true;
 }
 
@@ -225,34 +226,34 @@ bool Settings::isNapEnabled() {
 
 bool Settings::startNap(uint16_t durationMinutes) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
     // This function is now deprecated in favor of Clock::startNap
     // which has access to the current time
-    Logger.warning(MAIN_LOG, "Settings::startNap is deprecated, use Clock::startNap instead");
+    Log::warning("Settings::startNap is deprecated, use Clock::startNap instead");
     return false;
 }
 
 bool Settings::stopNap() {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
-    Logger.info(MAIN_LOG, "Stopping nap");
+    Log::info("Stopping nap");
     return setNapEnabled(false);
 }
 
 bool Settings::setLocked(bool locked) {
     if (!initialized) {
-        Logger.error(MAIN_LOG, "Settings not initialized");
+        Log::error("Settings not initialized");
         return false;
     }
     
     preferences.putBool("device_locked", locked);
-    Logger.info(MAIN_LOG, "Device lock state set to: %s", locked ? "true" : "false");
+    Log::info("Device lock state set to: %s", locked ? "true" : "false");
     return true;
 }
 

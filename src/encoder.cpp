@@ -1,10 +1,9 @@
 #include "encoder.h"
-#include <Elog.h>
-#include <logging.h>
+#include "logging.h"
 
-#define DIAL_CLK_PIN 18
-#define DIAL_DT_PIN 19
-#define DIAL_SW_PIN 21
+#define DIAL_CLK_PIN 2
+#define DIAL_DT_PIN 3
+#define DIAL_SW_PIN 4
 
 ESP32Encoder encoder;
 

@@ -1,10 +1,9 @@
 #include "clock.h"
-#include "state_machine.h"
-#include "settings.h"
+#include "logging.h"
 #include "rgbled.h"
 #include "schedule.h"
-#include <Elog.h>
-#include <logging.h>
+#include "settings.h"
+#include "state_machine.h"
 
 // Static member definitions
 String Clock::timeString = "0000";
@@ -24,20 +23,20 @@ void Clock::init(int pin) {
     // Read initial time
     checkAndUpdateTime();
 
-    Logger.info(MAIN_LOG, "Clock initialized");
+    Log::info("Clock initialized");
 }
 
 void Clock::enableSQWInterrupt() {
     if (sqwPin != -1) {
         attachInterrupt(digitalPinToInterrupt(sqwPin), sqwInterrupt, FALLING);
-        Logger.info(MAIN_LOG, "SQW interrupt enabled");
+        Log::info("SQW interrupt enabled");
     }
 }
 
 void Clock::disableSQWInterrupt() {
     if (sqwPin != -1) {
         detachInterrupt(digitalPinToInterrupt(sqwPin));
-        Logger.info(MAIN_LOG, "SQW interrupt disabled");
+        Log::info("SQW interrupt disabled");
     }
 }
 
@@ -67,7 +66,7 @@ void Clock::setTime(uint8_t hours, uint8_t minutes, uint8_t seconds) {
     // Update our local time string immediately
     checkAndUpdateTime();
 
-    Logger.info(MAIN_LOG, "Time set to %02d:%02d:%02d", hours, minutes, seconds);
+    Log::info("Time set to %02d:%02d:%02d", hours, minutes, seconds);
 }
 
 void Clock::checkAndUpdateTime() {
@@ -108,11 +107,11 @@ void Clock::checkAndUpdateTime() {
             
             // Logging
             const char* ampm = (hours24 < 12) ? "AM" : "PM";
-            Logger.info(MAIN_LOG, "Time updated: %02d:%02d:%02d %s (String: %s)", 
+            Log::info("Time updated: %02d:%02d:%02d %s (String: %s)", 
                           hours12, minutes, seconds, ampm, timeString.c_str());
         }
     } else {
-        Logger.error(MAIN_LOG, "Error reading from RTC");
+        Log::error("Error reading from RTC");
     }
 }
 
@@ -221,18 +220,18 @@ void Clock::updateScheduleLED() {
     bool hasActiveNap = Settings::isNapEnabled() && Settings::loadNapSchedule(napSchedule);
     
     if (hasActiveNap) {
-        Logger.info(MAIN_LOG, "Active nap detected, using nap schedule");
-        
+        Log::info("Active nap detected, using nap schedule");
+
         // Use the Schedule class's getCurrentBlock method to determine phase
         ScheduleBlock currentBlock = napSchedule.getCurrentBlock();
         
-        Logger.info(MAIN_LOG, "Nap Schedule: Current block = %d", currentBlock);
+        Log::info("Nap Schedule: Current block = %d", currentBlock);
                     
         // Set LED color based on nap phase
         RgbLed::indicateStatus(currentBlock);
         if (currentBlock == NO_BLOCK) {
             // If nap is over, deactivate it
-            Logger.info(MAIN_LOG, "Nap period ended, deactivating nap");
+            Log::info("Nap period ended, deactivating nap");
             Settings::stopNap();
             RgbLed::turnOff();
             return; // Exit early since nap is over
@@ -248,8 +247,8 @@ void Clock::updateScheduleLED() {
     // Use the Schedule class's getCurrentBlock method
     ScheduleBlock currentBlock = todaySchedule.getCurrentBlock();
 
-    Logger.info(MAIN_LOG, "Current time: %02d:%02d, Day: %d", currentHour, currentMinute, dayOfWeek);
-    Logger.info(MAIN_LOG, "Daily Schedule: Current block = %d", currentBlock);
+    Log::info("Current time: %02d:%02d, Day: %d", currentHour, currentMinute, dayOfWeek);
+    Log::info("Daily Schedule: Current block = %d", currentBlock);
     
     RgbLed::indicateStatus(currentBlock);
 }
@@ -257,9 +256,9 @@ void Clock::updateScheduleLED() {
 bool Clock::startNap(uint16_t durationMinutes) {
     uint8_t currentHour = getCurrentHours();
     uint8_t currentMinute = getCurrentMinutes();
-    
-    Logger.info(MAIN_LOG, "Starting nap at %02d:%02d for %d minutes", currentHour, currentMinute, durationMinutes);
-    
+
+    Log::info("Starting nap at %02d:%02d for %d minutes", currentHour, currentMinute, durationMinutes);
+
     // Use the Schedule class to create a nap schedule
     Schedule napSchedule = Schedule::getNap(durationMinutes);
     
@@ -267,8 +266,8 @@ bool Clock::startNap(uint16_t durationMinutes) {
     bool success = Settings::saveNapSchedule(napSchedule) && Settings::setNapEnabled(true);
     
     if (success) {
-        Logger.info(MAIN_LOG, "Nap schedule created and enabled for %d minutes", durationMinutes);
-        
+        Log::info("Nap schedule created and enabled for %d minutes", durationMinutes);
+
         // Update LED immediately
         updateScheduleLED();
     }

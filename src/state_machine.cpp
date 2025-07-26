@@ -3,8 +3,7 @@
 #include "clock.h"
 #include "settings.h"
 #include "schedule.h"
-#include <Elog.h>
-#include <logging.h>
+#include "logging.h"
 
 State* currentState = nullptr;
 
@@ -166,7 +165,7 @@ State MenuNap = {
     if (Settings::isNapEnabled()) {
       Settings::stopNap();
       Clock::updateScheduleLED();
-      Logger.info(MAIN_LOG, "Nap stopped by user");
+      Log::info("Nap stopped by user");
       StateMachine::setState(&Clock);
     } else {
       tempNapDuration = 60;
@@ -311,7 +310,7 @@ void saveCompleteSchedule() {
     allSchedules[i] = schedule;
   }
   Settings::saveAllSchedules(allSchedules);
-  Logger.info(MAIN_LOG, "Schedule saved to all days of the week");
+  Log::info("Schedule saved to all days of the week");
 }
 
 State ScheduleSetSleepHours = {
@@ -457,9 +456,9 @@ State NapSetDuration = {
   .OnSelect = []() { 
     // Start the nap with the selected duration
     if (Clock::startNap(tempNapDuration)) {
-      Logger.info(MAIN_LOG, "Nap started with duration %d minutes", tempNapDuration);
+      Log::info("Nap started with duration %d minutes", tempNapDuration);
     } else {
-      Logger.error(MAIN_LOG, "Failed to start nap");
+      Log::error("Failed to start nap");
     }
     StateMachine::setState(&Clock); 
   },

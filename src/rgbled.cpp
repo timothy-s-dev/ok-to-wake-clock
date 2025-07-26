@@ -1,17 +1,15 @@
 #include "rgbled.h"
 #include <schedule.h>
+#include <Adafruit_NeoPixel.h>
 
-#define RGB_RED_PIN 33
-#define RGB_GREEN_PIN 32
-#define RGB_BLUE_PIN 25
+#define DATA_PIN 44
+#define NUMPIXELS 16
+
+Adafruit_NeoPixel pixels(NUMPIXELS, DATA_PIN, NEO_GRB + NEO_KHZ800);
 
 void RgbLed::init() {
-    pinMode(RGB_RED_PIN, OUTPUT);
-    pinMode(RGB_GREEN_PIN, OUTPUT);
-    pinMode(RGB_BLUE_PIN, OUTPUT);
-    analogWrite(RGB_RED_PIN, 0);
-    analogWrite(RGB_GREEN_PIN, 0);
-    analogWrite(RGB_BLUE_PIN, 0);
+    pixels.begin();
+    pixels.show(); // Initialize all pixels to 'off'
 }
 
 void RgbLed::indicateStatus(ScheduleBlock scheduleBlock) {
@@ -35,13 +33,13 @@ void RgbLed::indicateStatus(ScheduleBlock scheduleBlock) {
 }
 
 void RgbLed::turnOff() {
-    analogWrite(RGB_RED_PIN, 0);
-    analogWrite(RGB_GREEN_PIN, 0);
-    analogWrite(RGB_BLUE_PIN, 0);
+    pixels.clear();
+    pixels.show();
 }
 
 void RgbLed::setColor(uint8_t red, uint8_t green, uint8_t blue) {
-    analogWrite(RGB_RED_PIN, red);
-    analogWrite(RGB_GREEN_PIN, green);
-    analogWrite(RGB_BLUE_PIN, blue);
+    for (int i = 0; i < NUMPIXELS; i++) {
+        pixels.setPixelColor(i, pixels.Color(red, green, blue));
+    }
+    pixels.show();
 }
