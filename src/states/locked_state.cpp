@@ -31,6 +31,7 @@ State Locked = {
     Display::getInstance().clear();
     Display::getInstance().print("UNLK");
     delay(1000);
+    Settings::setLocked(false);
     StateMachine::setState(&Clock);
   },
   .OnTimeChange = []() {

@@ -18,6 +18,7 @@ extern State MenuTime;
 extern State MenuSchedule;
 extern State MenuNap;
 extern State MenuLock;
+extern State MenuBack;
 extern State TimeSetHours;
 extern State TimeSetMinutes;
 extern State ScheduleSetSleepHours;

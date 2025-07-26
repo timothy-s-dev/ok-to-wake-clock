@@ -55,11 +55,20 @@ State MenuLock = {
     Display::getInstance().print("LOCK");
   },
   .OnExit = []() { Display::getInstance().clear(); },
-  .OnClockwise = []() { StateMachine::setState(&MenuTime); },
+  .OnClockwise = []() { StateMachine::setState(&MenuBack); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuNap); },
   .OnSelect = []() { 
     Settings::setLocked(true);
     StateMachine::setState(&Locked);
   },
+  .OnSelectHold = []() { /* Do nothing */ }
+};
+
+State MenuBack = {
+  .OnEnter = []() { Display::getInstance().print("BACK"); },
+  .OnExit = []() { Display::getInstance().clear(); },
+  .OnClockwise = []() { StateMachine::setState(&MenuTime); },
+  .OnCounterClockwise = []() { StateMachine::setState(&MenuLock); },
+  .OnSelect = []() { StateMachine::setState(&Clock); },
   .OnSelectHold = []() { /* Do nothing */ }
 };
