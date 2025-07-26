@@ -25,16 +25,16 @@ public:
   void setWakeStart(uint8_t hour, uint8_t minute);
   void setWakeEnd(uint8_t hour, uint8_t minute);
 
-  uint8_t getWinddownStartMinute() const { return winddownStart / 60; }
-  uint8_t getWinddownStartHour() const { return winddownStart % 60; }
-  uint8_t getSleepStartMinute() const { return sleepStart / 60; }
-  uint8_t getSleepStartHour() const { return sleepStart % 60; }
-  uint8_t getQuietStartMinute() const { return quietStart / 60; }
-  uint8_t getQuietStartHour() const { return quietStart % 60; }
-  uint8_t getWakeStartMinute() const { return wakeStart / 60; }
-  uint8_t getWakeStartHour() const { return wakeStart % 60; }
-  uint8_t getWakeEndMinute() const { return wakeEnd / 60; }
-  uint8_t getWakeEndHour() const { return wakeEnd % 60; }
+  uint8_t getWinddownStartHour() const { return winddownStart / 60; }
+  uint8_t getWinddownStartMinute() const { return winddownStart % 60; }
+  uint8_t getSleepStartHour() const { return sleepStart / 60; }
+  uint8_t getSleepStartMinute() const { return sleepStart % 60; }
+  uint8_t getQuietStartHour() const { return quietStart / 60; }
+  uint8_t getQuietStartMinute() const { return quietStart % 60; }
+  uint8_t getWakeStartHour() const { return wakeStart / 60; }
+  uint8_t getWakeStartMinute() const { return wakeStart % 60; }
+  uint8_t getWakeEndHour() const { return wakeEnd / 60; }
+  uint8_t getWakeEndMinute() const { return wakeEnd % 60; }
 
   bool isActive() const;
   ScheduleBlock getCurrentBlock() const;
