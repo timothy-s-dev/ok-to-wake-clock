@@ -4,17 +4,7 @@
 #include <Arduino.h>
 #include "action.h"
 #include "settings.h"
-
-struct State {
-  void (*OnEnter)();
-  void (*OnExit)();
-
-  void (*OnClockwise)();
-  void (*OnCounterClockwise)();
-  void (*OnSelect)();
-  void (*OnSelectHold)();
-  void (*OnTimeChange)();
-};
+#include "states.h"
 
 class StateMachine {
 public:
