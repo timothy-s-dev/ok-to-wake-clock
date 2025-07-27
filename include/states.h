@@ -17,6 +17,7 @@ extern State Locked;
 extern State MenuTime;
 extern State MenuSchedule;
 extern State MenuNap;
+extern State MenuBrightness;
 extern State MenuLock;
 extern State MenuBack;
 extern State TimeSetHours;
@@ -26,5 +27,7 @@ extern State ScheduleSetSleepMinutes;
 extern State ScheduleSetQuietHours;
 extern State ScheduleSetQuietMinutes;
 extern State NapSetDuration;
+extern State SetDisplayBrightness;
+extern State SetColorBrightness;
 
 #endif

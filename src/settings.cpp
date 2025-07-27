@@ -264,3 +264,44 @@ bool Settings::isLocked() {
     
     return preferences.getBool("device_locked", false);
 }
+
+bool Settings::setDisplayBrightness(uint8_t brightness) {
+    if (!initialized) {
+        Log::error("Settings not initialized");
+        return false;
+    }
+    
+    // Clamp brightness to valid range (0-15 for HT16K33)
+    if (brightness > 15) brightness = 15;
+    
+    preferences.putUChar("display_lvl", brightness);
+    Log::info("Display brightness set to: %d", brightness);
+    return true;
+}
+
+uint8_t Settings::getDisplayBrightness() {
+    if (!initialized) {
+        return 3; // Default brightness
+    }
+    
+    return preferences.getUChar("display_lvl", 3);
+}
+
+bool Settings::setLedBrightness(uint8_t brightness) {
+    if (!initialized) {
+        Log::error("Settings not initialized");
+        return false;
+    }
+    
+    preferences.putUChar("led_lvl", brightness);
+    Log::info("LED brightness set to: %d", brightness);
+    return true;
+}
+
+uint8_t Settings::getLedBrightness() {
+    if (!initialized) {
+        return 128; // Default brightness (50% of 255)
+    }
+    
+    return preferences.getUChar("led_lvl", 128);
+}

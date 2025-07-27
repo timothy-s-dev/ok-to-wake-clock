@@ -1,4 +1,5 @@
 #include "rgbled.h"
+#include "settings.h"
 #include <schedule.h>
 #include <Adafruit_NeoPixel.h>
 
@@ -9,6 +10,7 @@ Adafruit_NeoPixel pixels(NUMPIXELS, DATA_PIN, NEO_GRB + NEO_KHZ800);
 
 void RgbLed::init() {
     pixels.begin();
+    pixels.setBrightness(Settings::getLedBrightness());
     pixels.show(); // Initialize all pixels to 'off'
 }
 
@@ -42,4 +44,10 @@ void RgbLed::setColor(uint8_t red, uint8_t green, uint8_t blue) {
         pixels.setPixelColor(i, pixels.Color(red, green, blue));
     }
     pixels.show();
+}
+
+void RgbLed::setBrightness(uint8_t brightness) {
+    pixels.setBrightness(brightness);
+    Settings::setLedBrightness(brightness);
+    pixels.show(); // Update display with new brightness
 }

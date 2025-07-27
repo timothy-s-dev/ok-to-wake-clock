@@ -35,7 +35,7 @@ State MenuNap = {
     }
   },
   .OnExit = []() { Display::getInstance().clear(); },
-  .OnClockwise = []() { StateMachine::setState(&MenuLock); },
+  .OnClockwise = []() { StateMachine::setState(&MenuBrightness); },
   .OnCounterClockwise = []() { StateMachine::setState(&MenuSchedule); },
   .OnSelect = []() { 
     if (Settings::isNapEnabled()) {
@@ -50,13 +50,22 @@ State MenuNap = {
   .OnSelectHold = []() { /* Do nothing */ }
 };
 
+State MenuBrightness = {
+  .OnEnter = []() { Display::getInstance().print("BRGT"); },
+  .OnExit = []() { Display::getInstance().clear(); },
+  .OnClockwise = []() { StateMachine::setState(&MenuLock); },
+  .OnCounterClockwise = []() { StateMachine::setState(&MenuNap); },
+  .OnSelect = []() { StateMachine::setState(&SetDisplayBrightness); },
+  .OnSelectHold = []() { /* Do nothing */ }
+};
+
 State MenuLock = {
   .OnEnter = []() { 
     Display::getInstance().print("LOCK");
   },
   .OnExit = []() { Display::getInstance().clear(); },
   .OnClockwise = []() { StateMachine::setState(&MenuBack); },
-  .OnCounterClockwise = []() { StateMachine::setState(&MenuNap); },
+  .OnCounterClockwise = []() { StateMachine::setState(&MenuBrightness); },
   .OnSelect = []() { 
     Settings::setLocked(true);
     StateMachine::setState(&Locked);

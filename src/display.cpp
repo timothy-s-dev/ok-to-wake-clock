@@ -1,4 +1,5 @@
 #include "display.h"
+#include "settings.h"
 #include "logging.h"
 
 #define DISPLAY_I2C_ADDR 0x70
@@ -13,9 +14,17 @@ void Display::init() {
   }
   Log::info("Display acknowledged.");
 
-  display.setBrightness(3);
+  // Load saved brightness from settings
+  uint8_t savedBrightness = Settings::getDisplayBrightness();
+  display.setBrightness(savedBrightness);
 }
 
 HT16K33& Display::getInstance() {
     return display;
+}
+
+void Display::setBrightness(uint8_t brightness) {
+    if (brightness > 15) brightness = 15; // Clamp to valid range
+    display.setBrightness(brightness);
+    Settings::setDisplayBrightness(brightness);
 }

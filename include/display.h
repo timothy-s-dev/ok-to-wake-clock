@@ -9,6 +9,7 @@ class Display {
 public:
     static void init();
     static HT16K33& getInstance();
+    static void setBrightness(uint8_t brightness);
 };
 
 #endif // DISPLAY_H

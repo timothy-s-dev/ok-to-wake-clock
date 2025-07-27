@@ -57,6 +57,12 @@ public:
     static bool setLocked(bool locked); // Set lock mode state
     static bool isLocked(); // Check if device is locked
     
+    // Brightness functions
+    static bool setDisplayBrightness(uint8_t brightness); // Set display brightness (0-15)
+    static uint8_t getDisplayBrightness(); // Get display brightness
+    static bool setLedBrightness(uint8_t brightness); // Set RGB LED brightness (0-255)
+    static uint8_t getLedBrightness(); // Get RGB LED brightness
+    
     // Close preferences (call when shutting down)
     static void close();
 
